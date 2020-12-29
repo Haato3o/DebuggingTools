@@ -1,0 +1,15 @@
+﻿<HP:Widget x:Class="DebuggingTool.DebuggerWindow"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:HP="clr-namespace:HunterPie.GUI;assembly=HunterPie.UI"
+             x:Name="DebuggingToolsWindow"
+             Title="HunterPie - Debugging Tools" Topmost="True" Initialized="OnInitialized" Background="#FF080808">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="261*"/>
+            <ColumnDefinition Width="499*"/>
+        </Grid.ColumnDefinitions>
+        <TreeView x:Name="dataTreeView" Margin="0,0,0,0" FontFamily="Sometype Mono" FontSize="14" Background="#FF111111" Foreground="#FF292929" BorderBrush="{x:Null}"/>
+        <TextBox Text="{Binding ElementName=DebuggingToolsWindow, Path=DataText}" FontSize="14" FontFamily="Sometype Mono" Grid.Column="1" Margin="5,0,0,0" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" IsReadOnly="True" IsReadOnlyCaretVisible="True" Background="#FF111111" BorderBrush="{x:Null}" Foreground="#FFEEEEEE"/>
+    </Grid>
+</HP:Widget>

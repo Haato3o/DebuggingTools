@@ -1,14 +1,13 @@
 ﻿using System.Windows.Controls;
 using HunterPie.Core.Definitions;
 using HunterPie.Core;
+using HunterPie.Core.Enums;
 
 namespace DebuggingTool.Controls
 {
     public class CustomItem : TreeViewItem
     {
-        public Monster MonsterData { get; set; }
-        public Part PartData { get; set; }
-        public Ailment AilmentData { get; set; }
+        public object Data { get; set; }
     }
     public class MonsterFilteredData
     {
@@ -33,6 +32,33 @@ namespace DebuggingTool.Controls
             MaxStamina = m.MaxStamina;
             Action = m.ActionReferenceName;
             ModelData = m.ModelData;
+        }
+    }
+    public class PlayerFilteredData
+    {
+        public string Name { get; }
+        public long SteamId { get; }
+        public string Zone { get; }
+        public float Health { get; }
+        public float MaxHealth { get; }
+        public float Stamina { get; }
+        public float MaxStamina { get; }
+        public Classes Weapon { get; }
+        public Vector3 Position { get; }
+        public string Action { get; }
+
+        public PlayerFilteredData(Player p)
+        {
+            Name = p.Name;
+            SteamId = p.SteamID;
+            Zone = p.ZoneName;
+            Health = p.Health.Health;
+            MaxHealth = p.Health.MaxHealth;
+            Stamina = p.Stamina.Stamina;
+            MaxStamina = p.Stamina.MaxStamina;
+            Weapon = (Classes)p.WeaponID;
+            Position = p.Position;
+            Action = p.PlayerActionRef;
         }
     }
 }

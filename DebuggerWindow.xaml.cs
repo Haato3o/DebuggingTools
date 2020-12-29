@@ -8,6 +8,9 @@ using HunterPie.Core.Events;
 using DebuggingTool.Controls;
 using Newtonsoft.Json;
 using HunterPie.GUI;
+using System.Diagnostics;
+using HunterPie.Core.Definitions;
+using Debugger = HunterPie.Logger.Debugger;
 
 namespace DebuggingTool
 {
@@ -16,6 +19,12 @@ namespace DebuggingTool
     /// </summary>
     public partial class DebuggerWindow : Widget
     {
+        struct sDebuggingInfo
+        {
+            public string[] ScanPlayer;
+            public string[] ScanMonster;
+            public string[] RenderTime;
+        };
 
         public string DataText
         {
@@ -25,28 +34,91 @@ namespace DebuggingTool
         public static readonly DependencyProperty DataTextProperty =
             DependencyProperty.Register("DataText", typeof(string), typeof(DebuggerWindow));
 
+        Stopwatch playerBenchmark = Stopwatch.StartNew();
+        Stopwatch renderBenchmark = Stopwatch.StartNew();
+        Stopwatch[] monstersBenchmark = { Stopwatch.StartNew(), Stopwatch.StartNew(), Stopwatch.StartNew() };
+
+        sDebuggingInfo debuggingInfo = new sDebuggingInfo
+        {
+            ScanPlayer = new string[] { "0ms" },
+            ScanMonster = new string[] { "0ms", "0ms", "0ms" },
+            RenderTime = new string[] { "0ms" }
+        };
+
         Game game;
+
+        TreeViewItem monsterItem;
+        CustomItem playerItem;
+        TreeViewItem partyItem;
+        CustomItem hunterPieItem;
 
         public DebuggerWindow()
         {
+            WidgetActive = true;
+            WidgetHasContent = true;
             InitializeComponent();
+        }
+
+        private void SetupItems()
+        {
+            monsterItem = new TreeViewItem()
+            {
+                Header = "Monsters",
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brushes.WhiteSmoke
+            };
+            playerItem = new CustomItem()
+            {
+                Header = "Player",
+                Data = game.Player,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brushes.WhiteSmoke
+            };
+            playerItem.Items.Add(new CustomItem { Header = "Inventory", Data = game.Player.Inventory, FontWeight = FontWeights.SemiBold, Foreground = Brushes.WhiteSmoke });
+            playerItem.Items.Add(new CustomItem { Header = "Set Skills", Data = game.Player.Skills, FontWeight = FontWeights.SemiBold, Foreground = Brushes.WhiteSmoke });
+
+            partyItem = new TreeViewItem()
+            {
+                Header = "Party",
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brushes.WhiteSmoke
+            };
+
+            hunterPieItem = new CustomItem()
+            {
+                Header = "HunterPie",
+                Data = debuggingInfo,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brushes.WhiteSmoke
+            };
+
+            dataTreeView.Items.Add(monsterItem);
+            dataTreeView.Items.Add(playerItem);
+            dataTreeView.Items.Add(partyItem);
+            dataTreeView.Items.Add(hunterPieItem);
         }
 
         private void OnRender(object sender, EventArgs e)
         {
+            float elapsed = renderBenchmark.ElapsedTicks / ((float)TimeSpan.TicksPerMillisecond);
+            debuggingInfo.RenderTime[0] = $"{elapsed}ms";
+            renderBenchmark.Restart();
             if (dataTreeView.SelectedItem is CustomItem)
             {
                 CustomItem selected = dataTreeView.SelectedItem as CustomItem;
                 
-                if (selected.AilmentData != null)
+                if (selected.Data is Monster)
                 {
-                    DataText = JsonConvert.SerializeObject(selected.AilmentData.cMonsterAilment, Formatting.Indented);
-                } else if (selected.PartData != null)
+                    Monster data = selected.Data as Monster;
+                    DataText = JsonConvert.SerializeObject(new MonsterFilteredData(data), Formatting.Indented);
+                } else if (selected.Data is Player)
                 {
-                    DataText = JsonConvert.SerializeObject(selected.PartData.cMonsterPartData, Formatting.Indented);
-                } else if (selected.MonsterData != null)
+                    Player data = selected.Data as Player;
+                    DataText = JsonConvert.SerializeObject(new PlayerFilteredData(data), Formatting.Indented);
+                }
+                else
                 {
-                    DataText = JsonConvert.SerializeObject(new MonsterFilteredData(selected.MonsterData), Formatting.Indented);
+                    DataText = JsonConvert.SerializeObject(selected.Data, Formatting.Indented);
                 }
                 
             }
@@ -55,6 +127,7 @@ namespace DebuggingTool
         internal void SetGameContext(Game ctx)
         {
             game = ctx;
+            SetupItems();
             HookEvents();
         }
 
@@ -65,7 +138,9 @@ namespace DebuggingTool
                 m.OnMonsterSpawn += OnMonsterSpawn;
                 m.OnMonsterAilmentsCreate += OnAilmentsCreate;
                 m.OnMonsterDespawn += OnMonsterDespawn;
+                m.OnMonsterScanFinished += OnMonsterScanFinished;
             }
+            game.Player.OnPlayerScanFinished += OnPlayerScanFinished;
         }
 
         internal void UnhookEvents()
@@ -74,7 +149,27 @@ namespace DebuggingTool
             {
                 m.OnMonsterSpawn -= OnMonsterSpawn;
                 m.OnMonsterAilmentsCreate -= OnAilmentsCreate;
+                m.OnMonsterDespawn -= OnMonsterDespawn;
+                m.OnMonsterScanFinished -= OnMonsterScanFinished;
             }
+            game.Player.OnPlayerScanFinished -= OnPlayerScanFinished;
+        }
+
+        private void OnPlayerScanFinished(object source, EventArgs args)
+        {
+            float elapsed = playerBenchmark.ElapsedTicks / ((float)TimeSpan.TicksPerMillisecond) - UserSettings.PlayerConfig.Overlay.GameScanDelay;
+            debuggingInfo.ScanPlayer[0] = $"{elapsed:0.00000}ms";
+            playerBenchmark.Restart();
+
+        }
+
+        private void OnMonsterScanFinished(object source, EventArgs args)
+        {
+            Monster m = (Monster)source;
+
+            float elapsed = monstersBenchmark[m.MonsterNumber - 1].ElapsedTicks / ((float)TimeSpan.TicksPerMillisecond) - UserSettings.PlayerConfig.Overlay.GameScanDelay;
+            debuggingInfo.ScanMonster[m.MonsterNumber - 1] = $"{elapsed:0.00000}ms";
+            monstersBenchmark[m.MonsterNumber - 1].Restart();
         }
 
         private void OnAilmentsCreate(object source, EventArgs args)
@@ -83,12 +178,8 @@ namespace DebuggingTool
 
             Dispatch(() =>
             {
-                TreeViewItem parentItem = null;
-                for (int i = 0; i < dataTreeView.Items.Count; i++)
-                {
-                    if ((dataTreeView.Items[i] as TreeViewItem).Header.ToString().StartsWith(m.MonsterNumber.ToString()))
-                        parentItem = dataTreeView.Items[i] as TreeViewItem;
-                }
+                CustomItem parentItem = monsterItem.Items.Cast<CustomItem>()
+                .Where(e => ((Monster)e.Data).MonsterNumber == m.MonsterNumber).FirstOrDefault();
 
                 if (parentItem is null)
                 {
@@ -102,7 +193,7 @@ namespace DebuggingTool
                     CustomItem item = new CustomItem
                     {
                         Header = $"{ailment.Id} [{ailment.Name}]",
-                        AilmentData = ailment,
+                        Data = ailment.cMonsterAilment,
                         FontWeight = FontWeights.Normal
                     };
                     parentItem.Items.Add(item);
@@ -120,7 +211,7 @@ namespace DebuggingTool
                 CustomItem parentItem = new CustomItem
                 {
                     Header = $"{m.MonsterNumber} [{m.Name}]",
-                    MonsterData = m,
+                    Data = m,
                     FontWeight = FontWeights.SemiBold,
                     Foreground = Brushes.WhiteSmoke
                 };
@@ -144,7 +235,7 @@ namespace DebuggingTool
                     CustomItem partItem = new CustomItem
                     {
                         Header = part.Name,
-                        PartData = part,
+                        Data = part.cMonsterPartData,
                         FontWeight = FontWeights.Normal,
                         Foreground = Brushes.WhiteSmoke
                     };
@@ -161,7 +252,7 @@ namespace DebuggingTool
                         CustomItem ailmItem = new CustomItem
                         {
                             Header = ailment.Name,
-                            AilmentData = ailment,
+                            Data = ailment.cMonsterAilment,
                             FontWeight = FontWeights.Normal,
                             Foreground = Brushes.WhiteSmoke
                         };
@@ -169,7 +260,7 @@ namespace DebuggingTool
                     }
                 }
 
-                dataTreeView.Items.Add(parentItem);
+                monsterItem.Items.Add(parentItem);
             });
         }
 
@@ -179,20 +270,11 @@ namespace DebuggingTool
 
             Dispatch(() =>
             {
-                TreeViewItem parentItem = null;
-                for (int i = 0; i < dataTreeView.Items.Count; i++)
-                {
-                    if ((dataTreeView.Items[i] as TreeViewItem).Header.ToString().StartsWith(m.MonsterNumber.ToString()))
-                        parentItem = dataTreeView.Items[i] as TreeViewItem;
-                }
-
-                if (parentItem is null)
-                {
-                    return;
-                }
-
+                CustomItem parentItem = monsterItem.Items.Cast<CustomItem>()
+                .Where(e => ((Monster)e.Data).MonsterNumber == m.MonsterNumber).FirstOrDefault();
+                
                 parentItem.Items.Clear();
-                dataTreeView.Items.Remove(parentItem);
+                monsterItem.Items.Remove(parentItem);
             });
             
         }

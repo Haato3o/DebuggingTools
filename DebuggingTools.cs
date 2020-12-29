@@ -2,6 +2,7 @@
 using System;
 using HunterPie.Plugins;
 using System.Windows;
+using HunterPie.GUI;
 
 namespace DebuggingTool
 {
@@ -31,6 +32,8 @@ namespace DebuggingTool
                 window = new DebuggerWindow();
                 window.SetGameContext(Context);
                 window.Show();
+
+                Overlay.RegisterWidget(window);
             }));
 
         }
@@ -38,6 +41,7 @@ namespace DebuggingTool
         private void UnhookEvents()
         {
             window.UnhookEvents();
+            Overlay.UnregisterWidget(window);
         }
     }
 }

@@ -17,13 +17,20 @@ namespace DebuggingTool
     /// <summary>
     /// Interaction logic for DebuggerWindow.xaml
     /// </summary>
-    public partial class DebuggerWindow : Widget
+    public partial class DebuggerWindow : Window
     {
+        struct MemoryManagement
+        {
+            public string[] PrivateMemory;
+            public string[] PagedMemory;
+            public int[] GarbageCollection;
+        }
         struct sDebuggingInfo
         {
             public string[] ScanPlayer;
             public string[] ScanMonster;
             public string[] RenderTime;
+            public MemoryManagement MemoryManagement;
         };
 
         public string DataText
@@ -34,15 +41,22 @@ namespace DebuggingTool
         public static readonly DependencyProperty DataTextProperty =
             DependencyProperty.Register("DataText", typeof(string), typeof(DebuggerWindow));
 
-        Stopwatch playerBenchmark = Stopwatch.StartNew();
-        Stopwatch renderBenchmark = Stopwatch.StartNew();
-        Stopwatch[] monstersBenchmark = { Stopwatch.StartNew(), Stopwatch.StartNew(), Stopwatch.StartNew() };
+        readonly Stopwatch playerBenchmark = Stopwatch.StartNew();
+        readonly Stopwatch renderBenchmark = Stopwatch.StartNew();
+        readonly Stopwatch[] monstersBenchmark = { Stopwatch.StartNew(), Stopwatch.StartNew(), Stopwatch.StartNew() };
 
         sDebuggingInfo debuggingInfo = new sDebuggingInfo
         {
             ScanPlayer = new string[] { "0ms" },
             ScanMonster = new string[] { "0ms", "0ms", "0ms" },
-            RenderTime = new string[] { "0ms" }
+            RenderTime = new string[] { "0ms" },
+            MemoryManagement = new MemoryManagement
+            {
+                PrivateMemory = new string[] { "0MB" },
+                PagedMemory = new string[] { "0MB" },
+                GarbageCollection = new int[] {0,0,0}
+            }
+
         };
 
         Game game;
@@ -54,8 +68,6 @@ namespace DebuggingTool
 
         public DebuggerWindow()
         {
-            WidgetActive = true;
-            WidgetHasContent = true;
             InitializeComponent();
         }
 
@@ -102,6 +114,13 @@ namespace DebuggingTool
         {
             float elapsed = renderBenchmark.ElapsedTicks / ((float)TimeSpan.TicksPerMillisecond);
             debuggingInfo.RenderTime[0] = $"{elapsed}ms";
+            
+            debuggingInfo.MemoryManagement.PrivateMemory[0] = $"{(Process.GetCurrentProcess().PrivateMemorySize64 / 1e+6)} MB";
+            debuggingInfo.MemoryManagement.PagedMemory[0] = $"{(Process.GetCurrentProcess().PagedMemorySize64 / 1e+6)} MB";
+            debuggingInfo.MemoryManagement.GarbageCollection[0] = GC.CollectionCount(0);
+            debuggingInfo.MemoryManagement.GarbageCollection[1] = GC.CollectionCount(1);
+            debuggingInfo.MemoryManagement.GarbageCollection[2] = GC.CollectionCount(2);
+
             renderBenchmark.Restart();
             if (dataTreeView.SelectedItem is CustomItem)
             {
@@ -121,6 +140,9 @@ namespace DebuggingTool
                     DataText = JsonConvert.SerializeObject(selected.Data, Formatting.Indented);
                 }
                 
+            } else
+            {
+                DataText = "No data to be displayed.";
             }
         }
 
@@ -286,5 +308,9 @@ namespace DebuggingTool
 
         private void Dispatch(Action f) =>
             Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, f);
+
+        private void OnForceGCClick(object sender, RoutedEventArgs e)
+        {
+        }
     }
 }

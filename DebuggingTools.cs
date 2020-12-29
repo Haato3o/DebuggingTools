@@ -22,18 +22,24 @@ namespace DebuggingTool
 
         public void Unload()
         {
-            UnhookEvents();
+            Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                UnhookEvents();
+                window.Close();
+                window = null;
+            }));
         }
 
         private void HookEvents()
         {
             Application.Current.Dispatcher.BeginInvoke(new Action(() =>
             {
-                window = new DebuggerWindow();
-                window.SetGameContext(Context);
-                window.Show();
-
-                Overlay.RegisterWidget(window);
+                if (window is null)
+                {
+                    window = new DebuggerWindow();
+                    window.SetGameContext(Context);
+                    window.Show();
+                }
             }));
 
         }
@@ -41,7 +47,6 @@ namespace DebuggingTool
         private void UnhookEvents()
         {
             window.UnhookEvents();
-            Overlay.UnregisterWidget(window);
         }
     }
 }
